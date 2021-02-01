@@ -8,11 +8,10 @@ from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant, Usern
 
 logging.basicConfig(level=logging.INFO)
 
-static_data_filter = filters.create(lambda _, __, query: query.data == "onUnMuteRequest")
-@Client.on_callback_query(static_data_filter)
+@Client.on(events.callbackquery.CallbackQuery(data="onUnMuteRequest"))
 def _onUnMuteRequest(client, cb):
-  user_id = cb.from_user.id
-  chat_id = cb.message.chat.id
+  user_id = cb.sender_id
+  chat_id = cb.chat_id
   chat_db = sql.fs_settings(chat_id)
   if chat_db:
     channel = chat_db.channel
