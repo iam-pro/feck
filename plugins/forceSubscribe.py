@@ -65,7 +65,7 @@ def _check_member(client, message):
     chat = await event.get_chat()
     admin = chat.admin_rights
     creator = chat.creator
-    if not admin and not creator and not user_id in Config.SUDO_USERS:
+    if user_id is not admin and user_id is not creator and not user_id in Config.SUDO_USERS:
       channel = chat_db.channel
       try:
         await client(functions.channels.GetParticipantRequest(channel=chat_id, user_id=user_id)
