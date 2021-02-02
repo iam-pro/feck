@@ -8,31 +8,48 @@ from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant, Usern
 
 logging.basicConfig(level=logging.INFO)
 
+UNBAN_RIGHTS = ChatBannedRights(
+    until_date=None,
+    send_messages=None,
+    send_media=None,
+    send_stickers=None,
+    send_gifs=None,
+    send_games=None,
+    send_inline=None,
+    embed_links=None,
+)
+
+
 @Client.on(events.callbackquery.CallbackQuery(data="onUnMuteRequest"))
-def _onUnMuteRequest(client, cb):
+async def _onUnMuteRequest(client, cb):
   user_id = cb.sender_id
   chat_id = cb.chat_id
   chat_db = sql.fs_settings(chat_id)
   if chat_db:
     channel = chat_db.channel
-    chat_member = client.get_chat_member(chat_id, user_id)
-    if chat_member.restricted_by:
-      if chat_member.restricted_by.id == (client.get_me()).id:
+    chat_member = await client.get_chat(chat_id)
+    
+    if chat_member.restricted:
+      if chat_member.restricted.id == (client.get_me()).id:
           try:
-            client.get_chat_member(channel, user_id)
-            client.unban_chat_member(chat_id, user_id)
-            if cb.message.reply_to_message.from_user.id == user_id:
-              cb.message.delete()
+            client.get_participants(channel, user_id)
+            client.(EditBannedRequest(event.chat_id, user_id, UNBAN_RIGHTS))
+             if cb.reply_to_msg_id == user_id:
+              cb.delete()
           except UserNotParticipant:
-            client.answer_callback_query(cb.id, text="❗ Join the mentioned 'channel' and press the 'UnMute Me' button again.", show_alert=True)
+            client.answer("❗ Join the mentioned 'channel' and press the 'UnMute Me' button again.", alert=True)
       else:
-        client.answer_callback_query(cb.id, text="❗ You are muted by admins for other reasons.", show_alert=True)
+        client.answer("❗ You are muted by admins for other reasons.", alert=True)
     else:
-      if not client.get_chat_member(chat_id, (client.get_me()).id).status == 'administrator':
-        client.send_message(chat_id, f"❗ **{cb.from_user.mention} is trying to UnMute himself but i can't unmute him because i am not an admin in this chat add me as admin again.**\n__#Leaving this chat...__")
-        client.leave_chat(chat_id)
+      chat = await cb.get_chat()
+      admin = chat.admin_rights
+      noob = await borg.get_entity(user_id)
+      namenoob = noob.first_name
+      if not admin:
+        await client.send_message(chat_id, f"❗ **[{namenoob}](tg://user?id={user_id}) is trying to UnMute himself but i can't unmute him because i am not an admin in this chat add me as admin again.**\n__#Leaving this chat...__")
+        await client(LeaveChannelRequest(chat_id))
       else:
-        client.answer_callback_query(cb.id, text="❗ Warning: Don't click the button if you can speak freely.", show_alert=True)
+        await client.answer("❗ Warning: Don't click the button if you can speak freely.", alert=True)
 
 
 
