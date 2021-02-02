@@ -27,23 +27,23 @@ async def _onUnMuteRequest(client, cb):
   chat_db = sql.fs_settings(chat_id)
   if chat_db:
     channel = chat_db.channel
-    chat_member = await client.get_chat(chat_id)
-    
-    if chat_member.restricted:
-      if chat_member.restricted.id == (client.get_me()).id:
+    chat_member = await client(functions.channels.GetParticipantRequest(channel=chat_id, user_id=user_id))
+    ok = (await client(functions.channels.GetParticipantRequest(channel=chat_id, user_id=user_id))).participant    
+    if ok.kicked_by:
+      if ok.kicked_by == (client.get_me()).id:
           try:
-            client.get_participants(channel, user_id)
-            client.(EditBannedRequest(event.chat_id, user_id, UNBAN_RIGHTS))
-             if cb.reply_to_msg_id == user_id:
+            await client(functions.channels.GetParticipantRequest(channel=chat_id, user_id=user_id))
+            await client.(EditBannedRequest(event.chat_id, user_id, UNBAN_RIGHTS))
+            if cb.reply_to_msg_id == user_id:
               cb.delete()
           except UserNotParticipant:
-            client.answer("❗ Join the mentioned 'channel' and press the 'UnMute Me' button again.", alert=True)
+            client.answer("❗ Join the 'channel' and press the 'UnMute Me' button again.", alert=True)
       else:
         client.answer("❗ You are muted by admins for other reasons.", alert=True)
     else:
       chat = await cb.get_chat()
       admin = chat.admin_rights
-      noob = await borg.get_entity(user_id)
+      noob = await client.get_entity(user_id)
       namenoob = noob.first_name
       if not admin:
         await client.send_message(chat_id, f"❗ **[{namenoob}](tg://user?id={user_id}) is trying to UnMute himself but i can't unmute him because i am not an admin in this chat add me as admin again.**\n__#Leaving this chat...__")
@@ -53,32 +53,36 @@ async def _onUnMuteRequest(client, cb):
 
 
 
-@Client.on_message(filters.text & ~filters.private & ~filters.edited, group=1)
+@client.on(events.NewMessage)
+@client.on(events.ChatAction)
+@client.on(events.MessageEdited)
+@client.on(events.MessageDeleted)
 def _check_member(client, message):
   chat_id = message.chat.id
   chat_db = sql.fs_settings(chat_id)
   if chat_db:
-    user_id = message.from_user.id
-    if not client.get_chat_member(chat_id, user_id).status in ("administrator", "creator") and not user_id in Config.SUDO_USERS:
+    user_id = message.sender_id
+    chat = await event.get_chat()
+    admin = chat.admin_rights
+    creator = chat.creator
+    if not admin and not creator and not user_id in Config.SUDO_USERS:
       channel = chat_db.channel
       try:
-        client.get_chat_member(channel, user_id)
+        await client(functions.channels.GetParticipantRequest(channel=chat_id, user_id=user_id)
       except UserNotParticipant:
         try:
-          sent_message = message.reply_text(
+          sent_message = message.reply(
               "{}, you are **not subscribed** to my [channel](https://t.me/{}) yet. Please [join](https://t.me/{}) and **press the button below** to unmute yourself.".format(message.from_user.mention, channel, channel),
-              disable_web_page_preview=True,
-              reply_markup=InlineKeyboardMarkup(
-                  [[InlineKeyboardButton("UnMute Me", callback_data="onUnMuteRequest")]]
-              )
+              buttons=[
+                [custom.Button.inline("Unmute Me", data="onUnMuteRequest")],],
           )
-          client.restrict_chat_member(chat_id, user_id, ChatPermissions(can_send_messages=False))
+          await client(EditBannedRequest(event.chat_id, user_id, UNBAN_RIGHTS))
         except ChatAdminRequired:
           sent_message.edit("❗ **I am not an admin here.**\n__Make me admin with ban user permission and add me again.\n#Leaving this chat...__")
-          client.leave_chat(chat_id)
+          await client(LeaveChannelRequest(chat_id))
       except ChatAdminRequired:
         client.send_message(chat_id, text=f"❗ **I am not an admin in @{channel}**\n__Make me admin in the channel and add me again.\n#Leaving this chat...__")
-        client.leave_chat(chat_id)
+        await client(LeaveChannelRequest(chat_id))
 
 
 @Client.on_message(filters.command(["forcesubscribe", "fsub"]) & ~filters.private)
